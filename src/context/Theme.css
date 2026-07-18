@@ -1,0 +1,63 @@
+/* Light theme (default) */
+:root,
+[data-theme="light"] {
+  --bg-app: #FFFDF5;
+  --bg-surface: #FFFFFF;
+  --bg-chat: #FFF8E6;
+  --bg-input-bar: #FFFDF5;
+  --bg-hover: #FFF3D6;
+
+  --accent: #F4B400;
+  --accent-dark: #D99000;
+  --accent-soft: #FFE9B3;
+
+  --border-color: #F0E6C8;
+
+  --text-primary: #212121;
+  --text-secondary: #757575;
+  --text-muted: #a89f8c;
+  --text-on-accent: #212121;
+
+  --bubble-out: #FFD54F;
+  --bubble-in: #FFFFFF;
+
+  --unread-bg: #FFF8E6;
+  --unread-border: #FFD54F;
+
+  --overlay: rgba(0, 0, 0, 0.5);
+  --shadow-color: rgba(217, 144, 0, 0.15);
+}
+
+/* Dark theme */
+[data-theme="dark"] {
+  --bg-app: #15130f;
+  --bg-surface: #1f1c16;
+  --bg-chat: #17140f;
+  --bg-input-bar: #1f1c16;
+  --bg-hover: #2a2419;
+
+  --accent: #F4B400;
+  --accent-dark: #FFC94D;
+  --accent-soft: #4a3c1f;
+
+  --border-color: #332c1e;
+
+  --text-primary: #F5EFE0;
+  --text-secondary: #b8ac93;
+  --text-muted: #7a6f58;
+  --text-on-accent: #1a1508;
+
+  --bubble-out: #8a6d00;
+  --bubble-in: #262119;
+
+  --unread-bg: #2a2419;
+  --unread-border: #8a6d00;
+
+  --overlay: rgba(0, 0, 0, 0.7);
+  --shadow-color: rgba(0, 0, 0, 0.4);
+}
+
+/* Smooth transition when switching themes */
+* {
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}

@@ -1,6 +1,19 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, X, MessageCircle, Users, Plus } from "lucide-react";
+import {
+  Search,
+  X,
+  MessageCircle,
+  Users,
+  SquarePen,
+  MoreVertical,
+  UserPlus,
+  Sun,
+  Moon,
+  Check,
+  CheckCheck,
+  Clock,
+} from "lucide-react";
 import {
   getConversations,
   lookupByPhone,
@@ -9,6 +22,28 @@ import {
 } from "../../services/api";
 import { useUser } from "../../context/UserContext";
 import { useWebSocketContext } from "../../context/WebSocketContext";
+import { useTheme } from "../../context/ThemeContext";
+
+const FILTERS = [
+  { id: "all", label: "All" },
+  { id: "unread", label: "Unread" },
+  { id: "groups", label: "Groups" },
+];
+
+function formatTime(timestamp) {
+  if (!timestamp) return "";
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return "";
+  const now = new Date();
+  const isToday = date.toDateString() === now.toDateString();
+  if (isToday) {
+    return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  }
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
+  return date.toLocaleDateString([], { day: "2-digit", month: "short" });
+}
 
 export default function ChatsScreen({ selectedUser, setSelectedUser }) {
   const [conversations, setConversations] = useState([]);
@@ -18,6 +53,9 @@ export default function ChatsScreen({ selectedUser, setSelectedUser }) {
   const [newChatPhone, setNewChatPhone] = useState("");
   const [searching, setSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeFilter, setActiveFilter] = useState("all");
+  const [topMenuVisible, setTopMenuVisible] = useState(false);
+  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const { userId } = useUser();
   const { addMessageListener, removeMessageListener, sendDeleteConversation } =
@@ -55,9 +93,6 @@ export default function ChatsScreen({ selectedUser, setSelectedUser }) {
     return () => removeMessageListener(handleIncoming);
   }, [userId, addMessageListener, removeMessageListener, loadAll]);
 
-  // Inside Home (WhatsApp-Web layout) this just sets the selected user in
-  // the right-hand pane. When Chats is used standalone (its own /chats
-  // route, no selectedUser wiring passed in), it falls back to navigation.
   const openChat = (userObj) => {
     if (setSelectedUser) {
       setSelectedUser(userObj);
@@ -117,52 +152,147 @@ export default function ChatsScreen({ selectedUser, setSelectedUser }) {
     ...conversations.map((c) => ({ ...c, isGroup: false, id: `user-${c.user_id}` })),
   ];
 
-  const filteredList = searchQuery.trim()
-    ? combinedList.filter((item) => {
-        const query = searchQuery.trim().toLowerCase();
-        if (item.isGroup) {
-          return item.name.toLowerCase().includes(query);
-        }
-        return (
-          item.username.toLowerCase().includes(query) ||
-          (item.phone_number && item.phone_number.includes(query))
-        );
-      })
-    : combinedList;
+  const unreadCount = conversations.filter((c) => c.unread_count > 0).length;
+  const groupsCount = groups.length;
+
+  let filteredList = combinedList;
+  if (activeFilter === "unread") {
+    filteredList = filteredList.filter((item) => !item.isGroup && item.unread_count > 0);
+  } else if (activeFilter === "groups") {
+    filteredList = filteredList.filter((item) => item.isGroup);
+  }
+
+  if (searchQuery.trim()) {
+    const query = searchQuery.trim().toLowerCase();
+    filteredList = filteredList.filter((item) => {
+      if (item.isGroup) return item.name.toLowerCase().includes(query);
+      return (
+        item.username.toLowerCase().includes(query) ||
+        (item.phone_number && item.phone_number.includes(query))
+      );
+    });
+  }
 
   if (loading) {
     return (
-      <div style={styles.centered}>
-        <div style={styles.spinner} />
+      <div style={styles.container}>
+        <div style={styles.centered}>
+          <div style={styles.spinner} />
+        </div>
       </div>
     );
   }
 
   return (
     <div style={styles.container}>
-      <div style={styles.searchBar}>
-        <Search size={18} color="#a89f8c" style={{ marginRight: 8, flexShrink: 0 }} />
-        <input
-          style={styles.searchInput}
-          placeholder="Search by name or number"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
-        {searchQuery.length > 0 && (
-          <button style={styles.iconBtn} onClick={() => setSearchQuery("")} aria-label="Clear search">
-            <X size={18} color="#a89f8c" />
+      <div style={styles.header}>
+        <p style={styles.headerTitle}>XORA</p>
+        <div style={styles.headerIcons}>
+          <button style={styles.iconBtn} onClick={() => setModalVisible(true)} aria-label="New chat">
+            <SquarePen size={20} color="var(--text-primary)" />
           </button>
-        )}
+          <button
+            style={styles.iconBtn}
+            onClick={() => setTopMenuVisible(true)}
+            aria-label="More options"
+          >
+            <MoreVertical size={20} color="var(--text-primary)" />
+          </button>
+        </div>
       </div>
+
+      <div style={styles.searchBarWrap}>
+        <div style={styles.searchBar}>
+          <Search size={17} color="var(--text-muted)" style={{ marginRight: 8, flexShrink: 0 }} />
+          <input
+            style={styles.searchInput}
+            placeholder="Search or start a new chat"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          {searchQuery.length > 0 && (
+            <button style={styles.clearBtn} onClick={() => setSearchQuery("")} aria-label="Clear search">
+              <X size={16} color="var(--text-muted)" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div style={styles.filterRow}>
+        {FILTERS.map((f) => {
+          const isActive = activeFilter === f.id;
+          const count = f.id === "unread" ? unreadCount : f.id === "groups" ? groupsCount : null;
+          return (
+            <button
+              key={f.id}
+              style={{ ...styles.filterChip, ...(isActive ? styles.filterChipActive : {}) }}
+              onClick={() => setActiveFilter(f.id)}
+            >
+              {f.label}
+              {count ? ` ${count}` : ""}
+            </button>
+          );
+        })}
+        <button
+          style={styles.filterAddChip}
+          onClick={() => setTopMenuVisible(true)}
+          aria-label="More filters"
+        >
+          <MoreVertical size={14} color="var(--text-secondary)" />
+        </button>
+      </div>
+
+      {topMenuVisible && (
+        <div style={styles.modalOverlay} onClick={() => setTopMenuVisible(false)}>
+          <div style={styles.attachModalBox} onClick={(e) => e.stopPropagation()}>
+            <button
+              style={styles.attachOption}
+              onClick={() => {
+                setTopMenuVisible(false);
+                setModalVisible(true);
+              }}
+            >
+              <UserPlus size={20} color="var(--accent-dark)" />
+              <span style={styles.attachOptionText}>Add contact</span>
+            </button>
+            <button
+              style={styles.attachOption}
+              onClick={() => {
+                setTopMenuVisible(false);
+                navigate("/group/create");
+              }}
+            >
+              <Users size={20} color="var(--accent-dark)" />
+              <span style={styles.attachOptionText}>Add group</span>
+            </button>
+            <button
+              style={styles.attachOption}
+              onClick={() => {
+                toggleTheme();
+                setTopMenuVisible(false);
+              }}
+            >
+              {theme === "light" ? (
+                <Moon size={20} color="var(--accent-dark)" />
+              ) : (
+                <Sun size={20} color="var(--accent-dark)" />
+              )}
+              <span style={styles.attachOptionText}>
+                {theme === "light" ? "Dark theme" : "Light theme"}
+              </span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {filteredList.length === 0 ? (
         <div style={styles.centered}>
           <div style={styles.emptyIconWrap}>
-            <MessageCircle size={40} color="#D99000" />
+            <MessageCircle size={40} color="var(--accent-dark)" />
           </div>
           <p style={styles.emptyText}>{searchQuery ? "No results found" : "No chats yet"}</p>
           <p style={styles.emptySubText}>
-            {searchQuery ? "Try a different search" : "Tap + to start a conversation"}
+            {searchQuery ? "Try a different search" : "Tap the pencil icon to start a conversation"}
           </p>
         </div>
       ) : (
@@ -179,11 +309,16 @@ export default function ChatsScreen({ selectedUser, setSelectedUser }) {
                     )
                   }
                 >
-                  <div style={{ ...styles.avatar, backgroundColor: "#D99000" }}>
+                  <div style={{ ...styles.avatar, backgroundColor: "var(--accent-dark)" }}>
                     <Users size={22} color="#fff" />
                   </div>
                   <div style={styles.chatInfo}>
-                    <p style={styles.chatName}>{item.name}</p>
+                    <div style={styles.chatTopRow}>
+                      <span style={styles.chatName}>{item.name}</span>
+                      {item.last_message_time && (
+                        <span style={styles.chatTime}>{formatTime(item.last_message_time)}</span>
+                      )}
+                    </div>
                     <p style={styles.chatMessage}>{item.last_message}</p>
                   </div>
                 </button>
@@ -192,12 +327,23 @@ export default function ChatsScreen({ selectedUser, setSelectedUser }) {
 
             const hasUnread = item.unread_count > 0;
             const isActive = String(selectedUser?.user_id) === String(item.user_id);
+            const isMine = item.last_message_from_me;
+            const TickIcon =
+              item.last_message_status === "sending"
+                ? Clock
+                : item.last_message_status === "read"
+                ? CheckCheck
+                : item.last_message_status === "delivered"
+                ? CheckCheck
+                : item.last_message_status
+                ? Check
+                : null;
+
             return (
               <button
                 key={item.id}
                 style={{
                   ...styles.chatItem,
-                  ...(hasUnread ? styles.chatItemUnread : {}),
                   ...(isActive ? styles.chatItemActive : {}),
                 }}
                 onClick={() => openChat({ user_id: item.user_id, username: item.username })}
@@ -231,32 +377,49 @@ export default function ChatsScreen({ selectedUser, setSelectedUser }) {
                   </div>
                 )}
                 <div style={styles.chatInfo}>
-                  <p style={{ ...styles.chatName, ...(hasUnread ? styles.chatNameUnread : {}) }}>
-                    {item.username}
-                  </p>
-                  <p
-                    style={{
-                      ...styles.chatMessage,
-                      ...(hasUnread ? styles.chatMessageUnread : {}),
-                    }}
-                  >
-                    {item.last_message}
-                  </p>
-                </div>
-                {hasUnread && (
-                  <div style={styles.unreadBadge}>
-                    <span style={styles.unreadBadgeText}>{item.unread_count}</span>
+                  <div style={styles.chatTopRow}>
+                    <span style={{ ...styles.chatName, ...(hasUnread ? styles.chatNameUnread : {}) }}>
+                      {item.username}
+                    </span>
+                    {item.last_message_time && (
+                      <span
+                        style={{
+                          ...styles.chatTime,
+                          ...(hasUnread ? styles.chatTimeUnread : {}),
+                        }}
+                      >
+                        {formatTime(item.last_message_time)}
+                      </span>
+                    )}
                   </div>
-                )}
+                  <div style={styles.chatBottomRow}>
+                    {isMine && TickIcon && (
+                      <TickIcon
+                        size={14}
+                        color={item.last_message_status === "read" ? "#53BDEB" : "var(--text-muted)"}
+                        style={{ flexShrink: 0 }}
+                      />
+                    )}
+                    <p
+                      style={{
+                        ...styles.chatMessage,
+                        ...(hasUnread ? styles.chatMessageUnread : {}),
+                      }}
+                    >
+                      {item.last_message}
+                    </p>
+                    {hasUnread && (
+                      <div style={styles.unreadBadge}>
+                        <span style={styles.unreadBadgeText}>{item.unread_count}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </button>
             );
           })}
         </div>
       )}
-
-      <button style={styles.fab} onClick={() => setModalVisible(true)} aria-label="New chat">
-        <Plus size={24} color="#212121" />
-      </button>
 
       {modalVisible && (
         <div style={styles.modalOverlay} onClick={() => setModalVisible(false)}>
@@ -291,7 +454,7 @@ export default function ChatsScreen({ selectedUser, setSelectedUser }) {
                 navigate("/group/create");
               }}
             >
-              <Users size={16} color="#D99000" style={{ marginRight: 6 }} />
+              <Users size={16} color="var(--accent-dark)" style={{ marginRight: 6 }} />
               <span style={styles.newGroupText}>Create new group</span>
             </button>
           </div>
@@ -306,46 +469,111 @@ const styles = {
     display: "flex",
     flexDirection: "column",
     height: "100dvh",
-    width: 340,
+    width: 380,
     flexShrink: 0,
-    backgroundColor: "#FFFDF5",
+    backgroundColor: "var(--bg-app)",
     position: "relative",
     fontFamily: "system-ui, -apple-system, sans-serif",
     overflow: "hidden",
+  },
+  header: {
+    display: "flex",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: "16px 16px 8px 16px",
+    flexShrink: 0,
+  },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: 700,
+    color: "var(--text-primary)",
+    margin: 0,
+    letterSpacing: 1,
+  },
+  headerIcons: {
+    display: "flex",
+    flexDirection: "row",
+    gap: 4,
+  },
+  iconBtn: {
+    background: "none",
+    border: "none",
+    cursor: "pointer",
+    padding: 8,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "50%",
+  },
+  searchBarWrap: {
+    padding: "4px 12px 8px 12px",
+    flexShrink: 0,
   },
   searchBar: {
     display: "flex",
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    marginLeft: 12,
-    marginRight: 12,
-    marginTop: 10,
-    marginBottom: 4,
-    borderRadius: 12,
+    backgroundColor: "var(--bg-hover)",
+    borderRadius: 20,
     paddingLeft: 14,
-    paddingRight: 14,
-    paddingTop: 10,
-    paddingBottom: 10,
-    border: "1px solid #F0E6C8",
+    paddingRight: 10,
+    paddingTop: 9,
+    paddingBottom: 9,
     boxSizing: "border-box",
-    flexShrink: 0,
   },
   searchInput: {
     flex: 1,
-    fontSize: 15,
-    color: "#212121",
+    fontSize: 14,
+    color: "var(--text-primary)",
     border: "none",
     outline: "none",
     backgroundColor: "transparent",
   },
-  iconBtn: {
+  clearBtn: {
     background: "none",
     border: "none",
     cursor: "pointer",
     padding: 0,
     display: "flex",
     alignItems: "center",
+  },
+  filterRow: {
+    display: "flex",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    padding: "0 12px 10px 12px",
+    flexShrink: 0,
+    overflowX: "auto",
+  },
+  filterChip: {
+    fontSize: 13,
+    fontWeight: 600,
+    color: "var(--text-secondary)",
+    backgroundColor: "var(--bg-hover)",
+    border: "none",
+    borderRadius: 16,
+    padding: "6px 14px",
+    cursor: "pointer",
+    whiteSpace: "nowrap",
+    flexShrink: 0,
+  },
+  filterChipActive: {
+    backgroundColor: "var(--accent-soft)",
+    color: "var(--accent-dark)",
+  },
+  filterAddChip: {
+    width: 30,
+    height: 30,
+    borderRadius: "50%",
+    backgroundColor: "var(--bg-hover)",
+    border: "none",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
   },
   centered: {
     flex: 1,
@@ -359,27 +587,25 @@ const styles = {
     width: 36,
     height: 36,
     borderRadius: "50%",
-    border: "4px solid #FFE9B3",
-    borderTopColor: "#F4B400",
+    border: "4px solid var(--accent-soft)",
+    borderTopColor: "var(--accent)",
     animation: "chats-spin 0.8s linear infinite",
   },
   emptyIconWrap: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: "#FFF8E6",
+    backgroundColor: "var(--bg-hover)",
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 16,
   },
-  emptyText: { fontSize: 16, color: "#212121", fontWeight: 600, margin: 0 },
-  emptySubText: { fontSize: 13, color: "#757575", marginTop: 6 },
+  emptyText: { fontSize: 16, color: "var(--text-primary)", fontWeight: 600, margin: 0 },
+  emptySubText: { fontSize: 13, color: "var(--text-secondary)", marginTop: 6, textAlign: "center" },
   list: {
     display: "flex",
     flexDirection: "column",
-    paddingTop: 6,
-    paddingBottom: 6,
     overflowY: "auto",
     flex: 1,
     minHeight: 0,
@@ -388,120 +614,144 @@ const styles = {
     display: "flex",
     flexDirection: "row",
     alignItems: "center",
-    padding: 12,
-    marginLeft: 8,
-    marginRight: 8,
-    marginTop: 4,
-    marginBottom: 4,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    boxShadow: "0 2px 6px rgba(217, 144, 0, 0.08)",
+    padding: "10px 16px",
+    backgroundColor: "transparent",
     border: "none",
+    borderBottom: "1px solid var(--border-color)",
     textAlign: "left",
     cursor: "pointer",
-    width: "calc(100% - 16px)",
-  },
-  chatItemUnread: {
-    backgroundColor: "#FFF8E6",
-    border: "1px solid #FFD54F",
+    width: "100%",
+    gap: 12,
+    boxSizing: "border-box",
   },
   chatItemActive: {
-    backgroundColor: "#FFECB3",
-    border: "1px solid #F4B400",
+    backgroundColor: "var(--bg-hover)",
   },
   avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: "#F4B400",
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "var(--accent)",
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 12,
     flexShrink: 0,
   },
   avatarButton: {
     display: "inline-flex",
     cursor: "pointer",
+    flexShrink: 0,
   },
-  avatarText: { color: "#212121", fontSize: 20, fontWeight: "bold" },
+  avatarText: { color: "var(--text-on-accent, #212121)", fontSize: 19, fontWeight: "bold" },
   avatarImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    marginRight: 12,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     objectFit: "cover",
+    display: "block",
   },
   chatInfo: { flex: 1, minWidth: 0 },
-  chatName: { fontSize: 16, fontWeight: 600, color: "#212121", margin: 0 },
-  chatNameUnread: { fontWeight: 800 },
-  chatMessage: {
-    fontSize: 14,
-    color: "#757575",
+  chatTopRow: {
+    display: "flex",
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  chatName: {
+    fontSize: 16,
+    fontWeight: 500,
+    color: "var(--text-primary)",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  chatNameUnread: { fontWeight: 700 },
+  chatTime: {
+    fontSize: 12,
+    color: "var(--text-secondary)",
+    flexShrink: 0,
+  },
+  chatTimeUnread: { color: "var(--accent-dark)", fontWeight: 600 },
+  chatBottomRow: {
+    display: "flex",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
     marginTop: 2,
-    marginBottom: 0,
+  },
+  chatMessage: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 14,
+    color: "var(--text-secondary)",
+    margin: 0,
     whiteSpace: "nowrap",
     overflow: "hidden",
     textOverflow: "ellipsis",
   },
-  chatMessageUnread: { color: "#8a6d00", fontWeight: 600 },
+  chatMessageUnread: { color: "var(--text-primary)", fontWeight: 500 },
   unreadBadge: {
-    minWidth: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: "#F4B400",
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "#25D366",
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
     paddingLeft: 6,
     paddingRight: 6,
-    marginLeft: 8,
     flexShrink: 0,
   },
-  unreadBadgeText: { color: "#212121", fontSize: 12, fontWeight: 700 },
-  fab: {
-    position: "absolute",
-    bottom: 24,
-    right: 24,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: "#F4B400",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    boxShadow: "0 4px 8px rgba(217, 144, 0, 0.4)",
-    border: "none",
-    cursor: "pointer",
-  },
+  unreadBadgeText: { color: "#0b0b0b", fontSize: 12, fontWeight: 700 },
   modalOverlay: {
     position: "fixed",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(0,0,0,0.5)",
+    backgroundColor: "var(--overlay)",
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
     zIndex: 10,
   },
+  attachModalBox: {
+    backgroundColor: "var(--bg-surface)",
+    borderRadius: 14,
+    padding: 10,
+    width: 200,
+  },
+  attachOption: {
+    display: "flex",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: "12px 10px",
+    width: "100%",
+    background: "none",
+    border: "none",
+    cursor: "pointer",
+    textAlign: "left",
+  },
+  attachOptionText: { fontSize: 15, color: "var(--text-primary)", fontWeight: 500 },
   modalBox: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "var(--bg-surface)",
     borderRadius: 12,
     padding: 20,
     width: "85%",
     maxWidth: 360,
   },
-  modalTitle: { fontSize: 17, fontWeight: 700, color: "#212121", marginBottom: 4, marginTop: 0 },
-  modalSubtitle: { fontSize: 13, color: "#757575", marginBottom: 14, marginTop: 0 },
+  modalTitle: { fontSize: 17, fontWeight: 700, color: "var(--text-primary)", marginBottom: 4, marginTop: 0 },
+  modalSubtitle: { fontSize: 13, color: "var(--text-secondary)", marginBottom: 14, marginTop: 0 },
   modalInput: {
     width: "100%",
-    border: "1px solid #FFD54F",
+    border: "1px solid var(--border-color)",
     borderRadius: 8,
     padding: 12,
     marginBottom: 16,
-    color: "#212121",
+    color: "var(--text-primary)",
+    backgroundColor: "var(--bg-app)",
     fontSize: 15,
     outline: "none",
     boxSizing: "border-box",
@@ -514,8 +764,8 @@ const styles = {
   },
   modalCancelBtn: { background: "none", border: "none", cursor: "pointer", padding: 0 },
   modalStartBtn: { background: "none", border: "none", cursor: "pointer", padding: 0 },
-  modalCancel: { color: "#757575", fontSize: 14 },
-  modalStart: { color: "#D99000", fontSize: 14, fontWeight: 700 },
+  modalCancel: { color: "var(--text-secondary)", fontSize: 14 },
+  modalStart: { color: "var(--accent-dark)", fontSize: 14, fontWeight: 700 },
   newGroupBtn: {
     display: "flex",
     flexDirection: "row",
@@ -523,15 +773,14 @@ const styles = {
     justifyContent: "center",
     marginTop: 16,
     paddingTop: 16,
-    borderTop: "1px solid #F0E6C8",
+    borderTop: "1px solid var(--border-color)",
     background: "none",
     border: "none",
-    borderTopStyle: "solid",
     width: "100%",
     cursor: "pointer",
     flexShrink: 0,
   },
-  newGroupText: { color: "#D99000", fontSize: 14, fontWeight: 600 },
+  newGroupText: { color: "var(--accent-dark)", fontSize: 14, fontWeight: 600 },
 };
 
 if (typeof document !== "undefined" && !document.getElementById("chats-spin-style")) {

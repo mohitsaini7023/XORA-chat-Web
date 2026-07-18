@@ -5,6 +5,7 @@ import PhoneLoginScreen from "./pages/auth/Login";
 import OtpVerifyScreen from "./pages/auth/Otpverify";
 import ChatScreen from "./pages/chat/Chat";
 import { Home } from "./pages/home/Home";
+import ProtectedRoute from "./routes/PrivateRoute";
 
 function App() {
   return (
@@ -13,8 +14,23 @@ function App() {
 
       <Route path="/login" element={<PhoneLoginScreen />} />
       <Route path="/otp-verify" element={<OtpVerifyScreen />} />
-      <Route path="/home" element={<Home />} />
-      <Route path="/chat/:id" element={<ChatScreen />} />
+
+      <Route
+        path="/home"
+        element={
+          <ProtectedRoute>
+            <Home />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/chat/:id"
+        element={
+          <ProtectedRoute>
+            <ChatScreen />
+          </ProtectedRoute>
+        }
+      />
     </Routes>
   );
 }
