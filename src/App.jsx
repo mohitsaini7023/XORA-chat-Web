@@ -3,8 +3,8 @@ import { Routes, Route } from "react-router-dom";
 import Welcome from "./pages/Welcome/Welcome";
 import PhoneLoginScreen from "./pages/auth/Login";
 import OtpVerifyScreen from "./pages/auth/Otpverify";
-import ChatScreen from "./pages/chat/Chat";
-import { Home } from "./pages/home/Home";
+import ChatScreen from "./pages/Chat/Chat";
+import { Home } from "./pages/Home/Home";
 import ProtectedRoute from "./routes/PrivateRoute";
 import CallScreen from "./pages/call/Call";
 

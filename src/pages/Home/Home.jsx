@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { MessageCircle } from "lucide-react";
-import ChatsScreen from "../chats/Chats";
-import ChatScreen from "../chat/Chat";
+import ChatsScreen from "../Chats/Chats";
+import ChatScreen from "../Chat/Chat";
 import SettingsScreen from "../setting/setting";
 import "./home.css";
 import { MdOutlineChat, MdOutlinePermMedia } from "react-icons/md";
