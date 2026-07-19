@@ -1,15 +1,18 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { MessageCircle } from "lucide-react";
 import ChatsScreen from "../chats/Chats";
 import ChatScreen from "../chat/Chat";
+import SettingsScreen from "../setting/setting";
 import "./home.css";
 import { MdOutlineChat, MdOutlinePermMedia } from "react-icons/md";
 import { FaRegDotCircle, FaUsers } from "react-icons/fa";
 import { BsWechat } from "react-icons/bs";
 import { CiCloudRainbow } from "react-icons/ci";
 import { IoSettingsOutline } from "react-icons/io5";
-import CallsScreen from "../Calls/Calls";
-import SettingsScreen from "../setting/setting";
+import { useWebSocketContext } from "../../context/WebSocketContext";
+import { getUserById } from "../../services/api";
+import ProfileScreen from "../Profile/Profile";
 
 // Top group of tabs. "chats" renders the real ChatsScreen; the rest render
 // a placeholder until their real screens are built — swap the `render`
@@ -42,6 +45,31 @@ function TabPlaceholder({ icon: Icon, label }) {
 export const Home = () => {
   const [selectedUser, setSelectedUser] = useState(null);
   const [activeTab, setActiveTab] = useState("chats");
+  const navigate = useNavigate();
+  const { incomingCall, setIncomingCall } = useWebSocketContext();
+
+  // WebSocketContext already sets `incomingCall` whenever an
+  // "incoming_call" event arrives over the socket (see WebSocketContext.jsx).
+  // Nothing was actually navigating to the call screen when that happened —
+  // this effect is what makes the receiver's UI actually ring.
+  useEffect(() => {
+    if (!incomingCall) return;
+
+    (async () => {
+      let username = `User ${incomingCall.from}`;
+      try {
+        const result = await getUserById(incomingCall.from);
+        if (result.success) username = result.username;
+      } catch (err) {
+        console.log("Failed to load caller info:", err);
+      }
+
+      navigate(
+        `/call/${incomingCall.from}?username=${encodeURIComponent(username)}&callType=${incomingCall.callType || "voice"}&isOutgoing=false`
+      );
+      setIncomingCall(null);
+    })();
+  }, [incomingCall, navigate, setIncomingCall]);
 
   const allTabs = [...TOP_TABS, ...BOTTOM_TABS];
   const currentTab = allTabs.find((t) => t.id === activeTab);
@@ -87,10 +115,14 @@ export const Home = () => {
 
       {activeTab === "chats" ? (
         <ChatsScreen selectedUser={selectedUser} setSelectedUser={setSelectedUser} />
-      ) : activeTab === "calls" ? (
-        <CallsScreen />
       ) : activeTab === "settings" ? (
-        <SettingsScreen/>
+        <div className="tab-middle-column">
+          <SettingsScreen />
+        </div>
+      ) : activeTab === "profile" ? (
+        <div className="tab-middle-column">
+          <ProfileScreen />
+        </div>
       ) : (
         <div className="tab-middle-column">
           <TabPlaceholder icon={currentTab?.icon || MdOutlineChat} label={currentTab?.label || "Profile"} />

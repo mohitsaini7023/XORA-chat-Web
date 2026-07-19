@@ -6,6 +6,7 @@ import OtpVerifyScreen from "./pages/auth/Otpverify";
 import ChatScreen from "./pages/chat/Chat";
 import { Home } from "./pages/home/Home";
 import ProtectedRoute from "./routes/PrivateRoute";
+import CallScreen from "./pages/call/Call";
 
 function App() {
   return (
@@ -31,6 +32,7 @@ function App() {
           </ProtectedRoute>
         }
       />
+      <Route path="/call/:id" element={<ProtectedRoute><CallScreen /></ProtectedRoute>} />
     </Routes>
   );
 }

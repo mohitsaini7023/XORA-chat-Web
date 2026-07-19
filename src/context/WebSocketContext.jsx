@@ -14,7 +14,7 @@ export function WebSocketProvider({ children }) {
   useEffect(() => {
     if (!userId) return;
 
-    const ws = new WebSocket("wss://xora-production-dafa.up.railway.app/ws");
+    const ws = new WebSocket("wss://xora-chat-backend-production.up.railway.app/ws");
     wsRef.current = ws;
 
     ws.onopen = () => {

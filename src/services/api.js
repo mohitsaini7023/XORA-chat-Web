@@ -1,4 +1,4 @@
-const BASE_URL = "https://xora-production-dafa.up.railway.app";
+const BASE_URL = "https://xora-chat-backend-production.up.railway.app";
 
 export async function registerUser(phone, username, photo) {
   const res = await fetch(`${BASE_URL}/register`, {

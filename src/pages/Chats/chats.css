@@ -1,0 +1,51 @@
+.logo-text{
+    position:relative;
+    display:inline-block;
+    animation:float 3s ease-in-out infinite;
+    text-shadow:
+        0 0 8px rgba(244,180,0,.4),
+        0 0 20px #f4b40080;
+}
+
+.logo-text::before{
+    content:"";
+    position:absolute;
+    top:0;
+    left:-120%;
+    width:60%;
+    height:100%;
+    background:linear-gradient(
+        90deg,
+        transparent,
+        rgba(255,255,255,.95),
+        transparent
+    );
+    transform:skewX(-25deg);
+    animation:shine 2.8s linear infinite;
+}
+
+@keyframes shine{
+
+0%{
+left:-120%;
+}
+
+100%{
+left:160%;
+}
+
+}
+
+@keyframes float{
+
+0%,100%{
+transform:translateY(0px) scale(1);
+letter-spacing:2px;
+}
+
+/* 50%{
+transform:translateY(-2px) scale(1.04);
+letter-spacing:5px;
+} */
+
+}

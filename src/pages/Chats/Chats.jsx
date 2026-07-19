@@ -23,6 +23,8 @@ import {
 import { useUser } from "../../context/UserContext";
 import { useWebSocketContext } from "../../context/WebSocketContext";
 import { useTheme } from "../../context/ThemeContext";
+import { motion } from "framer-motion";
+import "../../pages/Chats/chats.css"; 
 
 const FILTERS = [
   { id: "all", label: "All" },
@@ -186,7 +188,9 @@ export default function ChatsScreen({ selectedUser, setSelectedUser }) {
   return (
     <div style={styles.container}>
       <div style={styles.header}>
-        <p style={styles.headerTitle}>XORA</p>
+        <p className="logo-text" style={styles.headerTitle}>
+          XORA
+        </p>
         <div style={styles.headerIcons}>
           <button style={styles.iconBtn} onClick={() => setModalVisible(true)} aria-label="New chat">
             <SquarePen size={20} color="var(--text-primary)" />
@@ -332,12 +336,12 @@ export default function ChatsScreen({ selectedUser, setSelectedUser }) {
               item.last_message_status === "sending"
                 ? Clock
                 : item.last_message_status === "read"
-                ? CheckCheck
-                : item.last_message_status === "delivered"
-                ? CheckCheck
-                : item.last_message_status
-                ? Check
-                : null;
+                  ? CheckCheck
+                  : item.last_message_status === "delivered"
+                    ? CheckCheck
+                    : item.last_message_status
+                      ? Check
+                      : null;
 
             return (
               <button
@@ -485,11 +489,13 @@ const styles = {
     flexShrink: 0,
   },
   headerTitle: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: 700,
-    color: "var(--text-primary)",
+    color: "#F4B400",
     margin: 0,
-    letterSpacing: 1,
+    letterSpacing: "2px",
+    textShadow: "0 0 10px rgba(244,180,0,0.8)",
+    cursor: "pointer",
   },
   headerIcons: {
     display: "flex",
