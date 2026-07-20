@@ -10,6 +10,8 @@ export function WebSocketProvider({ children }) {
   const statusListenersRef = useRef([]);
   const callListenersRef = useRef([]);
   const [incomingCall, setIncomingCall] = useState(null);
+  const [callData, setCallData] = useState(null);
+  const [showCall, setShowCall] = useState(false);
 
   useEffect(() => {
     if (!userId) return;
@@ -165,7 +167,10 @@ export function WebSocketProvider({ children }) {
       sendWebrtcOffer, sendWebrtcAnswer, sendWebrtcIce,
       addCallListener, removeCallListener,
       incomingCall, setIncomingCall,
-      sendDeleteConversation,
+      sendDeleteConversation, showCall,
+      setShowCall,
+      callData,
+      setCallData
     }}>
       {children}
     </WebSocketContext.Provider>

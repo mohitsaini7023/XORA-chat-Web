@@ -7,12 +7,15 @@ import { useUser } from "../../context/UserContext";
 const ICE_SERVERS = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
 const RINGTONE_URL = "https://actions.google.com/sounds/v1/alarms/phone_alerts_and_rings.ogg";
 
-export default function CallScreen() {
-  const { id } = useParams();
+export default function CallScreen(props) {
+  const params = useParams();
   const [searchParams] = useSearchParams();
-  const username = searchParams.get("username");
-  const isOutgoing = searchParams.get("isOutgoing");
-  const paramCallType = searchParams.get("callType");
+
+  const id = props.id || params.id;
+  const username = props.username || searchParams.get("username");
+  const isOutgoing = props.isOutgoing ?? searchParams.get("isOutgoing") === "true";
+  const paramCallType = props.callType || searchParams.get("callType");
+
   const navigate = useNavigate();
   const { userId } = useUser();
   const {
@@ -30,7 +33,15 @@ export default function CallScreen() {
 
   const isVideoCall = paramCallType === "video" || incomingCall?.callType === "video";
 
-  const [callStatus, setCallStatus] = useState(isOutgoing === "true" ? "calling" : "connecting");
+  const goBack = () => {
+    if (props.onClose) {
+      props.onClose();
+    } else {
+      navigate(-1);
+    }
+  };
+
+  const [callStatus, setCallStatus] = useState(isOutgoing ? "calling" : "connecting");
   const [duration, setDuration] = useState(0);
   const [muted, setMuted] = useState(false);
   const [speakerOn, setSpeakerOn] = useState(false);
@@ -63,9 +74,6 @@ export default function CallScreen() {
     return () => clearInterval(timerRef.current);
   }, [callStatus]);
 
-  // Ringtone: browsers block autoplay-with-sound until a user gesture has
-  // happened somewhere on the page, so this may silently fail on the very
-  // first load — that's a browser limitation, not a bug in this code.
   useEffect(() => {
     if (callStatus === "calling" || callStatus === "connecting") {
       if (!audioRef.current) {
@@ -85,8 +93,6 @@ export default function CallScreen() {
     };
   }, [callStatus]);
 
-  // Attach streams to <video> elements whenever they change or the
-  // video/voice call view swaps in and out (refs remount).
   useEffect(() => {
     if (localVideoRef.current && localStream) {
       localVideoRef.current.srcObject = localStream;
@@ -109,14 +115,10 @@ export default function CallScreen() {
     } catch (err) {
       if (isCancelled()) return;
       alert("Could not access camera/microphone. Please check permissions.");
-      navigate(-1);
+      goBack();
       return;
     }
 
-    // The effect that started this run may have already been cleaned up
-    // (React StrictMode mounts effects twice in dev) — if so, this pc is
-    // already closed, so stop the tracks we just grabbed and bail instead
-    // of calling addTrack on a closed connection.
     if (isCancelled()) {
       stream.getTracks().forEach((t) => t.stop());
       return;
@@ -167,20 +169,25 @@ export default function CallScreen() {
         } catch (e) {}
       } else if (data.type === "call_rejected") {
         setCallStatus("rejected");
-        setTimeout(() => navigate(-1), 1500);
+        setTimeout(goBack, 1500);
       } else if (data.type === "call_ended") {
         setCallStatus("ended");
-        setTimeout(() => navigate(-1), 1000);
+        setTimeout(goBack, 1000);
       } else if (data.type === "call_unavailable") {
         setCallStatus("unavailable");
-        setTimeout(() => navigate(-1), 1500);
+        setTimeout(goBack, 1500);
       }
     };
 
     addCallListener(handleCallEvent);
     pcRef.current._listener = handleCallEvent;
 
-    if (isOutgoing === "true") {
+    // FIX: this used to fire twice — once here (guarded by the correct
+    // boolean `isOutgoing`) and again further down guarded by
+    // `isOutgoing === "true"`, which is always false once isOutgoing is a
+    // real boolean (as it is now, coming from props). The second, dead
+    // copy has been removed; this is the only place the offer is sent.
+    if (isOutgoing) {
       sendCallOffer(toId, isVideoCall ? "video" : "voice");
     }
   };
@@ -206,13 +213,13 @@ export default function CallScreen() {
 
   const rejectCall = () => {
     sendCallReject(toId);
-    navigate(-1);
+    goBack();
   };
 
   const endCall = () => {
     sendCallEnd(toId);
     cleanup();
-    navigate(-1);
+    goBack();
   };
 
   const toggleMute = () => {
@@ -254,25 +261,14 @@ export default function CallScreen() {
     return (
       <div style={styles.videoContainer}>
         {remoteStream ? (
-          <video
-            ref={remoteVideoRef}
-            autoPlay
-            playsInline
-            style={styles.remoteVideo}
-          />
+          <video ref={remoteVideoRef} autoPlay playsInline style={styles.remoteVideo} />
         ) : (
           <div style={{ ...styles.remoteVideo, ...styles.videoPlaceholder }}>
             <span style={styles.status}>Waiting for video...</span>
           </div>
         )}
         {localStream && !cameraOff && (
-          <video
-            ref={localVideoRef}
-            autoPlay
-            playsInline
-            muted
-            style={styles.localVideo}
-          />
+          <video ref={localVideoRef} autoPlay playsInline muted style={styles.localVideo} />
         )}
         <div style={styles.videoTopBar}>
           <span style={styles.videoName}>{username}</span>
@@ -280,13 +276,13 @@ export default function CallScreen() {
         </div>
         <div style={styles.videoControlsRow}>
           <button style={styles.controlBtnDark} onClick={toggleMute} aria-label="Toggle mute">
-            {muted ? <MicOff size={24} color="#fff" /> : <Mic size={24} color="#fff" />}
+            {muted ? <MicOff size={20} color="#fff" /> : <Mic size={20} color="#fff" />}
           </button>
           <button style={styles.controlBtnDark} onClick={toggleCamera} aria-label="Toggle camera">
-            {cameraOff ? <VideoOff size={24} color="#fff" /> : <VideoIcon size={24} color="#fff" />}
+            {cameraOff ? <VideoOff size={20} color="#fff" /> : <VideoIcon size={20} color="#fff" />}
           </button>
           <button style={{ ...styles.circleBtn, ...styles.rejectBtn }} onClick={endCall} aria-label="End call">
-            <PhoneOff size={26} color="#fff" />
+            <PhoneOff size={22} color="#fff" />
           </button>
         </div>
       </div>
@@ -308,24 +304,20 @@ export default function CallScreen() {
         {callStatus === "connecting" ? (
           <div style={styles.incomingButtons}>
             <button style={{ ...styles.circleBtn, ...styles.rejectBtn }} onClick={rejectCall} aria-label="Decline">
-              <PhoneOff size={28} color="#fff" />
+              <PhoneOff size={24} color="#fff" />
             </button>
             <button style={{ ...styles.circleBtn, ...styles.acceptBtn }} onClick={acceptCall} aria-label="Accept">
-              <Phone size={28} color="#fff" />
+              <Phone size={24} color="#fff" />
             </button>
           </div>
         ) : (
           <>
             <div style={styles.controlsRow}>
               <button style={styles.controlBtn} onClick={toggleMute} aria-label="Toggle mute">
-                {muted ? <MicOff size={24} color="#212121" /> : <Mic size={24} color="#212121" />}
+                {muted ? <MicOff size={20} color="#212121" /> : <Mic size={20} color="#212121" />}
               </button>
-              <button
-                style={styles.controlBtn}
-                onClick={() => setSpeakerOn(!speakerOn)}
-                aria-label="Toggle speaker"
-              >
-                {speakerOn ? <Volume2 size={24} color="#212121" /> : <Volume1 size={24} color="#212121" />}
+              <button style={styles.controlBtn} onClick={() => setSpeakerOn(!speakerOn)} aria-label="Toggle speaker">
+                {speakerOn ? <Volume2 size={20} color="#212121" /> : <Volume1 size={20} color="#212121" />}
               </button>
             </div>
             <button
@@ -333,7 +325,7 @@ export default function CallScreen() {
               onClick={endCall}
               aria-label="End call"
             >
-              <PhoneOff size={28} color="#fff" />
+              <PhoneOff size={24} color="#fff" />
             </button>
           </>
         )}
@@ -343,53 +335,57 @@ export default function CallScreen() {
 }
 
 const styles = {
+  // FIX: was height: "100dvh" (forces full viewport height even inside
+  // the small draggable modal box). Now fills whatever size the parent
+  // .call-modal container gives it.
   container: {
     display: "flex",
     flexDirection: "column",
-    height: "100dvh",
+    height: "100%",
+    width: "100%",
     backgroundColor: "#075E54",
     justifyContent: "space-between",
-    paddingTop: 60,
-    paddingBottom: 60,
+    padding: "24px 12px",
     fontFamily: "system-ui, -apple-system, sans-serif",
+    boxSizing: "border-box",
   },
   topSection: {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    marginTop: 40,
+    marginTop: 10,
   },
   bigAvatar: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
     backgroundColor: "var(--accent, #F4B400)",
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 16,
   },
-  bigAvatarText: { fontSize: 44, fontWeight: 700, color: "#212121" },
-  name: { fontSize: 24, fontWeight: 600, color: "#fff", marginBottom: 8, margin: 0 },
-  status: { fontSize: 15, color: "#e0e0e0", margin: 0 },
-  videoTag: { fontSize: 12, color: "var(--accent, #F4B400)", marginTop: 6, fontWeight: 600 },
+  bigAvatarText: { fontSize: 32, fontWeight: 700, color: "#212121" },
+  name: { fontSize: 18, fontWeight: 600, color: "#fff", marginBottom: 6, margin: 0 },
+  status: { fontSize: 13, color: "#e0e0e0", margin: 0 },
+  videoTag: { fontSize: 11, color: "var(--accent, #F4B400)", marginTop: 6, fontWeight: 600 },
   bottomSection: {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    gap: 30,
+    gap: 20,
   },
   controlsRow: {
     display: "flex",
     flexDirection: "row",
     justifyContent: "center",
-    gap: 30,
-    marginBottom: 10,
+    gap: 20,
+    marginBottom: 6,
   },
   controlBtn: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: "rgba(255,255,255,0.2)",
     display: "flex",
     justifyContent: "center",
@@ -398,9 +394,9 @@ const styles = {
     cursor: "pointer",
   },
   controlBtnDark: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: "rgba(255,255,255,0.2)",
     display: "flex",
     justifyContent: "center",
@@ -413,14 +409,14 @@ const styles = {
     flexDirection: "row",
     justifyContent: "space-around",
     width: "100%",
-    paddingLeft: 40,
-    paddingRight: 40,
+    paddingLeft: 20,
+    paddingRight: 20,
     boxSizing: "border-box",
   },
   circleBtn: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
@@ -431,7 +427,7 @@ const styles = {
   rejectBtn: { backgroundColor: "#E53935" },
   videoContainer: {
     position: "relative",
-    height: "100dvh",
+    height: "100%",
     width: "100%",
     backgroundColor: "#000",
     overflow: "hidden",
@@ -451,33 +447,33 @@ const styles = {
   },
   localVideo: {
     position: "absolute",
-    top: 50,
-    right: 16,
-    width: 100,
-    height: 140,
-    borderRadius: 12,
+    top: 8,
+    right: 8,
+    width: 70,
+    height: 96,
+    borderRadius: 10,
     backgroundColor: "#333",
     objectFit: "cover",
-    transform: "scaleX(-1)", // mirror, like the RN `mirror` prop
+    transform: "scaleX(-1)",
   },
   videoTopBar: {
     position: "absolute",
-    top: 50,
-    left: 16,
-    right: 130,
+    top: 8,
+    left: 8,
+    right: 90,
     display: "flex",
     flexDirection: "column",
   },
-  videoName: { color: "#fff", fontSize: 18, fontWeight: 600 },
-  videoDuration: { color: "#e0e0e0", fontSize: 13, marginTop: 2 },
+  videoName: { color: "#fff", fontSize: 14, fontWeight: 600 },
+  videoDuration: { color: "#e0e0e0", fontSize: 11, marginTop: 2 },
   videoControlsRow: {
     position: "absolute",
-    bottom: 40,
+    bottom: 12,
     left: 0,
     right: 0,
     display: "flex",
     flexDirection: "row",
     justifyContent: "center",
-    gap: 24,
+    gap: 14,
   },
 };

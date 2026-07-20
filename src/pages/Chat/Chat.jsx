@@ -28,6 +28,7 @@ import {
   getConversations,
   lookupByPhone,
 } from "../../services/api";
+import CallModal from "../modal/CallModal";
 
 const MAX_VIDEO_BYTES = 5 * 1024 * 1024;
 
@@ -66,7 +67,8 @@ export default function ChatScreen({ user, onBack, onSelectUser }) {
     sendEditMessage,
     sendDeleteMessage,
     sendMediaMessage,
-    requestViewMedia,
+    requestViewMedia, setShowCall,
+    setCallData
   } = useWebSocketContext();
 
   const [messages, setMessages] = useState([]);
@@ -86,6 +88,8 @@ export default function ChatScreen({ user, onBack, onSelectUser }) {
   const [contactSearchPhone, setContactSearchPhone] = useState("");
   const [callMenuVisible, setCallMenuVisible] = useState(false);
   const [messageOptionsFor, setMessageOptionsFor] = useState(null);
+  // const [showCall, setShowCall] = useState(false);
+  // const [callData, setCallData] = useState(null);
 
   const scrollEndRef = useRef(null);
   const pendingTempIds = useRef([]);
@@ -345,7 +349,7 @@ export default function ChatScreen({ user, onBack, onSelectUser }) {
       try {
         const contact = JSON.parse(item.mediaUrl);
         openContactChat(contact);
-      } catch (err) {}
+      } catch (err) { }
       return;
     }
     if (isMine || !item.viewLimit) {
@@ -467,7 +471,7 @@ export default function ChatScreen({ user, onBack, onSelectUser }) {
             let contact = {};
             try {
               contact = JSON.parse(item.mediaUrl);
-            } catch (e) {}
+            } catch (e) { }
             return (
               <button
                 key={item.id}
@@ -603,10 +607,17 @@ export default function ChatScreen({ user, onBack, onSelectUser }) {
             <button
               style={styles.attachOption}
               onClick={() => {
+
                 setCallMenuVisible(false);
-                navigate(
-                  `/call/${id}?username=${encodeURIComponent(displayName)}&isOutgoing=true&callType=voice`
-                );
+
+                setCallData({
+                  id: id,
+                  username: displayName,
+                  isOutgoing: true,
+                  callType: "voice"
+                });
+
+                setShowCall(true);
               }}
             >
               <Phone size={22} color="#D99000" />
@@ -615,10 +626,17 @@ export default function ChatScreen({ user, onBack, onSelectUser }) {
             <button
               style={styles.attachOption}
               onClick={() => {
+
                 setCallMenuVisible(false);
-                navigate(
-                  `/call/${id}?username=${encodeURIComponent(displayName)}&isOutgoing=true&callType=video`
-                );
+
+                setCallData({
+                  id: id,
+                  username: displayName,
+                  isOutgoing: true,
+                  callType: "video"
+                });
+
+                setShowCall(true);
               }}
             >
               <Video size={22} color="#D99000" />
@@ -778,6 +796,7 @@ export default function ChatScreen({ user, onBack, onSelectUser }) {
               </button>
             </div>
           </div>
+
         </div>
       )}
     </div>

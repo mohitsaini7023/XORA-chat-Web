@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import { MessageCircle } from "lucide-react";
 import ChatsScreen from "../Chats/Chats";
 import ChatScreen from "../Chat/Chat";
@@ -13,10 +12,10 @@ import { IoSettingsOutline } from "react-icons/io5";
 import { useWebSocketContext } from "../../context/WebSocketContext";
 import { getUserById } from "../../services/api";
 import ProfileScreen from "../Profile/Profile";
+import CallModal from "../modal/CallModal"; // FIX: was "../call/Call" (the raw
+// CallScreen, not the Draggable wrapper) — that's why the modal never
+// looked/behaved right even when it did render.
 
-// Top group of tabs. "chats" renders the real ChatsScreen; the rest render
-// a placeholder until their real screens are built — swap the `render`
-// for a real component whenever one is ready, no other wiring needed.
 const TOP_TABS = [
   { id: "chats", icon: MdOutlineChat, label: "Chats" },
   { id: "status", icon: FaRegDotCircle, label: "Status" },
@@ -45,13 +44,16 @@ function TabPlaceholder({ icon: Icon, label }) {
 export const Home = () => {
   const [selectedUser, setSelectedUser] = useState(null);
   const [activeTab, setActiveTab] = useState("chats");
-  const navigate = useNavigate();
-  const { incomingCall, setIncomingCall } = useWebSocketContext();
 
-  // WebSocketContext already sets `incomingCall` whenever an
-  // "incoming_call" event arrives over the socket (see WebSocketContext.jsx).
-  // Nothing was actually navigating to the call screen when that happened —
-  // this effect is what makes the receiver's UI actually ring.
+  // FIX: showCall/callData now come from WebSocketContext instead of a
+  // separate local useState. Chat.jsx's call buttons write to the context
+  // state — Home's own local state was never updated by that, so the
+  // modal's visibility condition was permanently stuck at false.
+  const { incomingCall, setIncomingCall, showCall, setShowCall, callData, setCallData } =
+    useWebSocketContext();
+
+  // FIX: incoming calls now open the same draggable modal (setCallData +
+  // setShowCall) instead of navigating to the old full-page /call/:id route.
   useEffect(() => {
     if (!incomingCall) return;
 
@@ -64,12 +66,16 @@ export const Home = () => {
         console.log("Failed to load caller info:", err);
       }
 
-      navigate(
-        `/call/${incomingCall.from}?username=${encodeURIComponent(username)}&callType=${incomingCall.callType || "voice"}&isOutgoing=false`
-      );
+      setCallData({
+        id: incomingCall.from,
+        username,
+        isOutgoing: false,
+        callType: incomingCall.callType || "voice",
+      });
+      setShowCall(true);
       setIncomingCall(null);
     })();
-  }, [incomingCall, navigate, setIncomingCall]);
+  }, [incomingCall, setIncomingCall, setCallData, setShowCall]);
 
   const allTabs = [...TOP_TABS, ...BOTTOM_TABS];
   const currentTab = allTabs.find((t) => t.id === activeTab);
@@ -149,6 +155,8 @@ export const Home = () => {
           </div>
         )}
       </div>
+
+      {showCall && <CallModal data={callData} onClose={() => setShowCall(false)} />}
     </div>
   );
 };

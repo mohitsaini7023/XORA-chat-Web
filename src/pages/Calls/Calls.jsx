@@ -4,7 +4,7 @@ import { Phone, PhoneOutgoing, PhoneIncoming, PhoneOff } from "lucide-react";
 import { getCallHistory } from "../../services/api";
 import { useUser } from "../../context/UserContext";
 
-export default function CallsScreen() {
+export default function CallsScreen({id,username,callType,isOutgoing}) {
   const [calls, setCalls] = useState([]);
   const [loading, setLoading] = useState(true);
   const { userId } = useUser();
